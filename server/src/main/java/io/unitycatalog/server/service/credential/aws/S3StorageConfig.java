@@ -15,4 +15,6 @@ public class S3StorageConfig {
   private final String secretKey;
   private final String sessionToken;
   private final String credentialGenerator;
+  private final String endpoint;
+  private final boolean pathStyleAccess;
 }
