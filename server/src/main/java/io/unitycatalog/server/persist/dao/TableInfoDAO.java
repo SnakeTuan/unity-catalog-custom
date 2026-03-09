@@ -1,0 +1,129 @@
+package io.unitycatalog.server.persist.dao;
+
+import io.unitycatalog.server.model.DataSourceFormat;
+import io.unitycatalog.server.model.TableInfo;
+import io.unitycatalog.server.model.TableType;
+import io.unitycatalog.server.utils.NormalizedURL;
+import jakarta.persistence.CascadeType;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.Index;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.Table;
+import java.util.Date;
+import java.util.List;
+import java.util.UUID;
+import lombok.AllArgsConstructor;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+import lombok.experimental.SuperBuilder;
+
+// Hibernate annotations
+@Entity
+@Table(
+    name = "uc_tables",
+    indexes = {
+      @Index(name = "idx_name", columnList = "name"),
+    })
+// Lombok annotations
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@EqualsAndHashCode(callSuper = true)
+@SuperBuilder
+public class TableInfoDAO extends IdentifiableDAO {
+  @Column(name = "schema_id")
+  private UUID schemaId;
+
+  @Column(name = "type")
+  private String type;
+
+  @Column(name = "owner")
+  private String owner;
+
+  @Column(name = "created_at")
+  private Date createdAt;
+
+  @Column(name = "created_by")
+  private String createdBy;
+
+  @Column(name = "updated_at")
+  private Date updatedAt;
+
+  @Column(name = "updated_by")
+  private String updatedBy;
+
+  @Column(name = "data_source_format")
+  private String dataSourceFormat;
+
+  @Column(name = "comment", length = 65535)
+  private String comment;
+
+  @Column(name = "url", length = 2048)
+  private String url;
+
+  @Column(name = "column_count")
+  private Integer columnCount;
+
+  @OneToMany(
+      mappedBy = "table",
+      cascade = CascadeType.ALL,
+      orphanRemoval = true,
+      fetch = FetchType.LAZY)
+  private List<ColumnInfoDAO> columns;
+
+  @Column(name = "uniform_iceberg_metadata_location", length = 65535)
+  private String uniformIcebergMetadataLocation;
+
+  @Column(name = "uniform_iceberg_converted_delta_version")
+  private Long uniformIcebergConvertedDeltaVersion;
+
+  @Column(name = "uniform_iceberg_converted_delta_timestamp")
+  private Date uniformIcebergConvertedDeltaTimestamp;
+
+  public static TableInfoDAO from(TableInfo tableInfo, UUID schemaId) {
+    return TableInfoDAO.builder()
+        .id(UUID.fromString(tableInfo.getTableId()))
+        .name(tableInfo.getName())
+        .comment(tableInfo.getComment())
+        .owner(tableInfo.getOwner())
+        .createdAt(
+            tableInfo.getCreatedAt() != null ? new Date(tableInfo.getCreatedAt()) : new Date())
+        .createdBy(tableInfo.getCreatedBy())
+        .updatedAt(tableInfo.getUpdatedAt() != null ? new Date(tableInfo.getUpdatedAt()) : null)
+        .updatedBy(tableInfo.getUpdatedBy())
+        .columnCount(tableInfo.getColumns() != null ? tableInfo.getColumns().size() : 0)
+        .type(tableInfo.getTableType().toString())
+        .dataSourceFormat(tableInfo.getDataSourceFormat().toString())
+        .url(tableInfo.getStorageLocation())
+        .columns(ColumnInfoDAO.fromList(tableInfo.getColumns()))
+        .schemaId(schemaId)
+        .build();
+  }
+
+  public TableInfo toTableInfo(boolean fetchColumns, String catalogName, String schemaName) {
+    TableInfo tableInfo =
+        new TableInfo()
+            .tableId(getId().toString())
+            .name(getName())
+            .catalogName(catalogName)
+            .schemaName(schemaName)
+            .tableType(TableType.valueOf(type))
+            .dataSourceFormat(DataSourceFormat.valueOf(dataSourceFormat))
+            .storageLocation(NormalizedURL.normalize(url))
+            .comment(comment)
+            .owner(owner)
+            .createdAt(createdAt != null ? createdAt.getTime() : null)
+            .createdBy(createdBy)
+            .updatedAt(updatedAt != null ? updatedAt.getTime() : null)
+            .updatedBy(updatedBy);
+    if (fetchColumns) {
+      tableInfo.columns(ColumnInfoDAO.toList(columns));
+    }
+    return tableInfo;
+  }
+}

@@ -1,0 +1,49 @@
+etc/db/h2db.mv.db
+etc/db/h2db.trace.db
+target/
+
+# Intellij IDEA files
+.idea/
+*.iml
+
+.bsp/
+etc/logs/
+api/.openapi-generator
+build/sbt-launch-*
+venv
+uc_docs_venv
+.venv
+.DS_Store
+server_pid.txt
+site
+python_engine.log
+.python-version
+.java-version
+
+# Signing keys and access tokens
+etc/conf/certs.json
+etc/conf/*.txt
+etc/conf/*.der
+connectors/spark/etc/conf/certs.json
+connectors/spark/etc/conf/*.txt
+connectors/spark/etc/conf/*.der
+integration-tests/etc/conf/certs.json
+integration-tests/etc/conf/*.txt
+integration-tests/etc/conf/*.der
+
+# test
+.pytest_cache/
+mlruns/
+
+# Byte-compiled files
+__pycache__
+*.pyc
+
+# Editor files
+*.vscode
+.metals/
+
+# packaging
+dist/
+*.egg-info/
+Pipfile

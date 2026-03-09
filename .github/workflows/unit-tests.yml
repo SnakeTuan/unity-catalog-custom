@@ -1,0 +1,40 @@
+# This workflow uses actions that are not certified by GitHub.
+# They are provided by a third-party and are governed by
+# separate terms of service, privacy policy, and support
+# documentation.
+
+name: Unit Tests
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up JDK 17
+      uses: actions/setup-java@v4
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+
+      # 'integrationTests' is not in root project, since we avoid running it via `./build/sbt test`,
+      # Here, we explicitly compile `integrationTests` to catch compilation issues early.
+    - name: Compile integration tests to verify compilation and checkstyle issues.
+      run: build/sbt integrationTests/test:compile
+
+    - name: Build and verify the local deployment.
+      run: build/sbt clean package publishM2
+
+    - name: Run tests with coverage
+      run: build/sbt -J-Xmx2G +jacoco
+
+    - name: Run license check
+      run: build/sbt licenseCheck
