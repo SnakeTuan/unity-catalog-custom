@@ -87,6 +87,18 @@ public class SecurityContext {
         .sign(algorithm);
   }
 
+  public String createAccessTokenForEmail(String email) {
+    return JWT.create()
+        .withSubject(serviceName)
+        .withIssuer(localIssuer)
+        .withIssuedAt(new Date())
+        .withKeyId(keyId)
+        .withJWTId(UUID.randomUUID().toString())
+        .withClaim(JwtClaim.TOKEN_TYPE.key(), JwtTokenType.ACCESS.name())
+        .withClaim(JwtClaim.SUBJECT.key(), email)
+        .sign(algorithm);
+  }
+
   public String createServiceToken() {
     return JWT.create()
         .withSubject(serviceName)

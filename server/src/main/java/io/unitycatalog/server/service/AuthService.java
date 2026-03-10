@@ -29,12 +29,14 @@ import io.unitycatalog.control.model.OAuthTokenExchangeInfo;
 import io.unitycatalog.control.model.TokenEndpointExtensionType;
 import io.unitycatalog.control.model.TokenType;
 import io.unitycatalog.control.model.User;
+import io.unitycatalog.server.exception.AuthorizationException;
 import io.unitycatalog.server.exception.ErrorCode;
 import io.unitycatalog.server.exception.GlobalExceptionHandler;
 import io.unitycatalog.server.exception.OAuthInvalidRequestException;
 import io.unitycatalog.server.persist.Repositories;
 import io.unitycatalog.server.persist.UserRepository;
 import io.unitycatalog.server.security.JwtClaim;
+import io.unitycatalog.server.security.JwtTokenType;
 import io.unitycatalog.server.security.SecurityContext;
 import io.unitycatalog.server.utils.JwksOperations;
 import io.unitycatalog.server.utils.ServerProperties;
@@ -189,6 +191,71 @@ public class AuthService {
               return HttpResponse.of(headers, HttpData.ofUtf8(EMPTY_RESPONSE));
             })
         .orElse(HttpResponse.of(HttpStatus.OK, MediaType.JSON, EMPTY_RESPONSE));
+  }
+
+  /**
+   * Impersonate a user.
+   *
+   * <p>Allows an admin (caller with a SERVICE token) to obtain a UC ACCESS token for any existing,
+   * enabled user by email. Intended for automation scenarios (e.g., Airflow cron jobs) where no
+   * human is present to authenticate via an identity provider.
+   *
+   * <p>This endpoint is protected by AuthDecorator (requires a valid UC token) and further
+   * restricted to SERVICE token holders only.
+   *
+   * @param userEmail The email of the target user to impersonate.
+   * @return An OAuth token exchange response containing an ACCESS token for the target user.
+   */
+  @Post("/impersonate")
+  public HttpResponse impersonate(@Param("user_email") String userEmail) {
+    if (!serverProperties.isAuthorizationEnabled()) {
+      throw new OAuthInvalidRequestException(
+          ErrorCode.INVALID_ARGUMENT, "Authorization is disabled");
+    }
+
+    // Get caller's JWT from request context (set by AuthDecorator)
+    ServiceRequestContext ctx = ServiceRequestContext.current();
+    DecodedJWT callerJwt = ctx.attr(AuthDecorator.DECODED_JWT_ATTR);
+    if (callerJwt == null) {
+      throw new AuthorizationException(
+          ErrorCode.UNAUTHENTICATED, "No authentication context found.");
+    }
+
+    // Only SERVICE token holders (admin) can impersonate
+    com.auth0.jwt.interfaces.Claim tokenTypeClaim = callerJwt.getClaim(JwtClaim.TOKEN_TYPE.key());
+    if (tokenTypeClaim == null
+        || tokenTypeClaim.isNull()
+        || !JwtTokenType.SERVICE.name().equals(tokenTypeClaim.asString())) {
+      throw new AuthorizationException(
+          ErrorCode.PERMISSION_DENIED, "Only SERVICE token holders can impersonate users.");
+    }
+
+    if (userEmail == null || userEmail.isBlank()) {
+      throw new OAuthInvalidRequestException(ErrorCode.INVALID_ARGUMENT, "user_email is required.");
+    }
+
+    // Validate target user exists and is enabled
+    User targetUser;
+    try {
+      targetUser = userRepository.getUserByEmail(userEmail);
+    } catch (Exception e) {
+      throw new OAuthInvalidRequestException(ErrorCode.NOT_FOUND, "User not found: " + userEmail);
+    }
+    if (targetUser == null || targetUser.getState() != User.StateEnum.ENABLED) {
+      throw new OAuthInvalidRequestException(
+          ErrorCode.INVALID_ARGUMENT, "User not allowed: " + userEmail);
+    }
+
+    LOGGER.info("Impersonating user: {} (requested by admin)", userEmail);
+    String accessToken = securityContext.createAccessTokenForEmail(userEmail);
+
+    OAuthTokenExchangeInfo tokenExchangeInfo =
+        new OAuthTokenExchangeInfo()
+            .accessToken(accessToken)
+            .issuedTokenType(TokenType.ACCESS_TOKEN)
+            .tokenType(AccessTokenType.BEARER);
+
+    return HttpResponse.ofJson(tokenExchangeInfo);
   }
 
   private void verifyPrincipal(DecodedJWT decodedJWT) {
