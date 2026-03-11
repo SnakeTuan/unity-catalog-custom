@@ -314,8 +314,11 @@ public class ServerProperties {
       String credentialGenerator = getProperty("s3.credentialGenerator." + i);
       String endpoint = getProperty("s3.endpoint." + i);
       String pathStyleAccess = getProperty("s3.pathStyleAccess." + i);
+      String minioGateway = getProperty("s3.minioGateway." + i);
+      boolean isMinioGw = minioGateway != null && minioGateway.trim().equalsIgnoreCase("true");
       if ((bucketPath == null || region == null || awsRoleArn == null)
-          && (accessKey == null || secretKey == null || sessionToken == null)) {
+          && (accessKey == null || secretKey == null || sessionToken == null)
+          && !isMinioGw) {
         break;
       }
       S3StorageConfig s3StorageConfig =
@@ -329,6 +332,7 @@ public class ServerProperties {
               .credentialGenerator(credentialGenerator)
               .endpoint(endpoint)
               .pathStyleAccess(pathStyleAccess != null && pathStyleAccess.equalsIgnoreCase("true"))
+              .minioGateway(isMinioGw)
               .build();
       s3BucketConfigMap.put(NormalizedURL.from(bucketPath), s3StorageConfig);
       i++;

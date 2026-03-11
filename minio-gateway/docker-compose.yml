@@ -1,0 +1,16 @@
+services:
+  minio-gateway:
+    image: uzumlukek/minio-gateway:latest
+    command: gateway s3 https://s3.hcm-3.cloud.cmctelecom.vn --console-address ":9001"
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: ${CMC_S3_ACCESS_KEY}
+      MINIO_ROOT_PASSWORD: ${CMC_S3_SECRET_KEY}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped

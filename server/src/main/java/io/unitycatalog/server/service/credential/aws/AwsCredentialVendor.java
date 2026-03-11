@@ -101,6 +101,11 @@ public class AwsCredentialVendor {
   }
 
   private AwsCredentialGenerator createPerBucketCredentialGenerator(S3StorageConfig config) {
+    // MinIO gateway buckets use their own STS generator
+    if (config.isMinioGateway()) {
+      return new MinioStsCredentialGenerator(config);
+    }
+
     // Dynamically load and initialize the generator if it's intentionally configured.
     if (config.getCredentialGenerator() != null) {
       try {
@@ -126,6 +131,19 @@ public class AwsCredentialVendor {
 
   public Credentials vendAwsCredentials(CredentialContext context) {
     AwsCredentialGenerator generator;
+
+    // MinIO gateway buckets always use per-bucket generator, even when a CredentialDAO is present
+    // (from external location). The credential/external location exist for authorization checks
+    // only — actual credential vending goes through MinIO STS.
+    S3StorageConfig minioConfig = perBucketS3Configs.get(context.getStorageBase());
+    if (minioConfig != null && minioConfig.isMinioGateway()) {
+      generator =
+          perBucketCredGenerators.computeIfAbsent(
+              context.getStorageBase(),
+              storageBase -> createPerBucketCredentialGenerator(minioConfig));
+      return generator.generate(context);
+    }
+
     if (context.getCredentialDAO().isPresent()) {
       // Use the master role STS generator
       generator = getAwsS3MasterRoleStsGenerator();

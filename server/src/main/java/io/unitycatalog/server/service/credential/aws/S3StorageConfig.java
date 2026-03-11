@@ -17,4 +17,5 @@ public class S3StorageConfig {
   private final String credentialGenerator;
   private final String endpoint;
   private final boolean pathStyleAccess;
+  private final boolean minioGateway;
 }
